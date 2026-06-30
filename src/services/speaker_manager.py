@@ -11,11 +11,19 @@ class SpeakerManager:
 
     def register_speaker(self, name: str, audio_path: str) -> bool:
         try:
-            embedding = self.processor.extract_embedding(audio_path)
-
+            new_embedding = self.processor.extract_embedding(audio_path)
             save_path = EMBEDDINGS_DIR / f"{name}.npy"
-            np.save(save_path, embedding)
-            print(f"✅ User '{name}' registered successfully.")
+
+            if save_path.exists():
+                # Update existing embedding by averaging
+                old_embedding = np.load(save_path)
+                combined_embedding = (old_embedding + new_embedding) / 2
+                np.save(save_path, combined_embedding)
+                print(f"✅ Updated registration for '{name}' with new sample.")
+            else:
+                np.save(save_path, new_embedding)
+                print(f"✅ Registered new user '{name}'.")
+
             return True
         except Exception as e:
             print(f"❌ Error registering speaker: {e}")
