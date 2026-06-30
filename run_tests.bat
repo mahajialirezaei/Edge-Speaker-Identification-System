@@ -2,7 +2,7 @@
 echo 🚀 Starting tests inside the Docker container...
 echo ===================================================
 
-docker-compose run --rm speaker-id pytest tests/ -v
+python -m pytest tests/ -v
 
 echo ===================================================
 echo ✅ Test execution finished.

@@ -1,0 +1,4 @@
+data/registered/temp_*
+data/embeddings/*.npy
+__pycache__/
+*.pyc
