@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  speaker-id:
+    build: .
+    container_name: speaker_id_edge
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
