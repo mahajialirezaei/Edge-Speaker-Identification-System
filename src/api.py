@@ -58,8 +58,6 @@ async def audio_stream_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("🔗 WebSocket Connected for Audio Streaming!")
 
-    speaker_identified = False
-
     try:
         while True:
             data = await websocket.receive_bytes()
@@ -73,7 +71,7 @@ async def audio_stream_endpoint(websocket: WebSocket):
 
             response_payload = {"status": "listening", "speaker": "Unknown", "confidence": 0.0}
 
-            if wake_word_detected and not speaker_identified:
+            if wake_word_detected:
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                     sf.write(tmp_file.name, current_buffer, 16000)
                     tmp_path = tmp_file.name
@@ -82,12 +80,12 @@ async def audio_stream_endpoint(websocket: WebSocket):
                     speaker_name, score = manager.identify_speaker(tmp_path, threshold=0.6)
 
                     if speaker_name != "Unknown":
-                        speaker_identified = True
                         response_payload = {
                             "status": "identified",
                             "speaker": speaker_name,
                             "confidence": round(score, 4)
                         }
+                        stream_manager.clear()
                     else:
                         response_payload = {
                             "status": "searching",
