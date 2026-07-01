@@ -1,5 +1,6 @@
 import uvicorn
 import argparse
+from src.utils.benchmark import ResourceMonitor
 
 def main():
     parser = argparse.ArgumentParser(description="Speaker Identification Edge Node")
@@ -7,8 +8,14 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="Port Number")
     args = parser.parse_args()
 
+    monitor = ResourceMonitor(interval=4)
+    monitor.start()
+
     print(f"🚀 Starting Edge API on {args.host}:{args.port}...")
-    uvicorn.run("src.api:app", host=args.host, port=args.port, reload=False)
+    try:
+        uvicorn.run("src.api:app", host=args.host, port=args.port, reload=False)
+    finally:
+        monitor.stop()
 
 if __name__ == "__main__":
     main()

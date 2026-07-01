@@ -1,4 +1,6 @@
 import os
+import tempfile
+import soundfile as sf
 import shutil
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from src.services.speaker_manager import SpeakerManager
@@ -55,19 +57,48 @@ async def identify_user(file: UploadFile = File(...)):
 async def audio_stream_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("🔗 WebSocket Connected for Audio Streaming!")
+
+    speaker_identified = False
+
     try:
         while True:
             data = await websocket.receive_bytes()
-
             audio_chunk_int16 = np.frombuffer(data, dtype=np.int16)
             audio_chunk_float32 = audio_chunk_int16.astype(np.float32) / 32768.0
 
             stream_manager.add_chunk(audio_chunk_float32)
+            current_buffer = stream_manager.get_full_buffer()
 
-            await websocket.send_json({
-                "status": "receiving",
-                "buffer_size": len(stream_manager.get_full_buffer())
-            })
+            wake_word_detected = len(current_buffer) >= 16000
+
+            response_payload = {"status": "listening", "speaker": "Unknown", "confidence": 0.0}
+
+            if wake_word_detected and not speaker_identified:
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+                    sf.write(tmp_file.name, current_buffer, 16000)
+                    tmp_path = tmp_file.name
+
+                try:
+                    speaker_name, score = manager.identify_speaker(tmp_path, threshold=0.6)
+
+                    if speaker_name != "Unknown":
+                        speaker_identified = True
+                        response_payload = {
+                            "status": "identified",
+                            "speaker": speaker_name,
+                            "confidence": round(score, 4)
+                        }
+                    else:
+                        response_payload = {
+                            "status": "searching",
+                            "speaker": "Unknown",
+                            "confidence": round(score, 4)
+                        }
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+
+            await websocket.send_json(response_payload)
 
     except WebSocketDisconnect:
         print("❌ WebSocket Disconnected.")
