@@ -1,10 +1,13 @@
-# src/api.py
 import os
 import shutil
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from src.services.speaker_manager import SpeakerManager
 from src.config import REGISTERED_DIR
+from fastapi import WebSocket, WebSocketDisconnect
+import numpy as np
+from src.services.stream_manager import AudioStreamManager
 
+stream_manager = AudioStreamManager()
 app = FastAPI(title="Edge Speaker Identification API")
 manager = SpeakerManager()
 
@@ -46,3 +49,26 @@ async def identify_user(file: UploadFile = File(...)):
         "identified_speaker": speaker_name,
         "confidence_score": round(score, 4)
     }
+
+
+@app.websocket("/ws/stream/")
+async def audio_stream_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("🔗 WebSocket Connected for Audio Streaming!")
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+
+            audio_chunk_int16 = np.frombuffer(data, dtype=np.int16)
+            audio_chunk_float32 = audio_chunk_int16.astype(np.float32) / 32768.0
+
+            stream_manager.add_chunk(audio_chunk_float32)
+
+            await websocket.send_json({
+                "status": "receiving",
+                "buffer_size": len(stream_manager.get_full_buffer())
+            })
+
+    except WebSocketDisconnect:
+        print("❌ WebSocket Disconnected.")
+        stream_manager.clear()
